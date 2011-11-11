@@ -1,19 +1,17 @@
 package fragsoft.indexprober;
 
-import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.RAMDirectory;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 public class IndexProberTest {
 	
+	private static final String INDEX_LOCATION = "C:/eudract.d/ctr/index/__ctr_doc";
 	private ProbingTool probingTool;
 	
 	@BeforeClass
 	public void init() {
-		Directory directory = new RAMDirectory();
-		probingTool = new LuceneProbingTool(directory);
+		probingTool = new LuceneProbingTool(INDEX_LOCATION);
 	}
 	
 	@Test()

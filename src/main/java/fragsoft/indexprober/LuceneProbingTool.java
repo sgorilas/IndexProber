@@ -22,25 +22,6 @@ public class LuceneProbingTool implements ProbingTool {
 	private static final Logger LOG = LoggerFactory.getLogger(LuceneProbingTool.class);
 	private Directory indexDir;
 
-	/**
-	 * Creates and returns an instance of the pre-agreed document.
-	 * 
-	 * @return an instance of the pre-agreed document.
-	 */
-	public static final Document createPreAgreedDocument() {
-		Document preAgreedDocument = new Document();
-		Field field = new Field(ProbingTool.DOCUMENT_FIELD,
-				ProbingTool.DOCUMENT_CATCHPHRASE, Field.Store.NO,
-				Field.Index.ANALYZED);
-		preAgreedDocument.add(field);
-
-		return preAgreedDocument;
-	}
-
-	public LuceneProbingTool(Directory indexDir) {
-		this.indexDir = indexDir;
-	}
-
 	public LuceneProbingTool(String indexLocation) {
 		try {
 			indexDir = FSDirectory.getDirectory(indexLocation);
@@ -49,75 +30,90 @@ public class LuceneProbingTool implements ProbingTool {
 		}
 	}
 
+	/**
+	 * Creates and returns an instance of the pre-agreed document.
+	 * 
+	 * @return an instance of the pre-agreed document.
+	 */
+	public static final Document createPreAgreedDocument() {
+		Document preAgreedDocument = new Document();
+		Field field = new Field(ProbingTool.DOCUMENT_FIELD, ProbingTool.DOCUMENT_CATCHPHRASE, Field.Store.NO, Field.Index.ANALYZED);
+		preAgreedDocument.add(field);
+		
+		return preAgreedDocument;
+	}
+	
+	public LuceneProbingTool(Directory indexDir) {
+		this.indexDir = indexDir;
+	}
+	
 	public boolean insert() {
-		if (indexDir == null)
-			throw new AssertionError("Index directory cannot be null. ");
-		boolean outcome = false;
-		try {
-			IndexWriter writer = getIndexWriter();
-			writer.addDocument(createPreAgreedDocument());
-			writer.close();
-			outcome = true;
-		} catch (CorruptIndexException e) {
-			LOG.error("Index corrupted! ", e);
-		} catch (LockObtainFailedException e) {
-			LOG.error("Index locked! ", e);
-		} catch (IOException e) {
-			LOG.error("Error: ", e);
-		}
-
-		return outcome;
+		return luceneProbingTemplate.probe(new ProbeCode() {
+			public boolean execute() throws CorruptIndexException, LockObtainFailedException, IOException {
+				IndexWriter writer = getIndexWriter();
+				writer.addDocument(createPreAgreedDocument());
+				writer.close();
+				return true;
+			}
+		});
 	}
 
 	public boolean find() {
-		if (indexDir == null)
-			throw new AssertionError("Index directory cannot be null. ");
-		boolean outcome = false;
-		try {
-			IndexSearcher searcher = new IndexSearcher(indexDir);
-			Term term = new Term(ProbingTool.DOCUMENT_FIELD,
-					ProbingTool.DOCUMENT_CATCHPHRASE);
-			Query query = new TermQuery(term);
-			int hits = searcher.search(query, 1).totalHits;
-			if (hits == 1) {
-				outcome = true;
+		return luceneProbingTemplate.probe(new ProbeCode() {
+			public boolean execute() throws CorruptIndexException, LockObtainFailedException, IOException {
+				IndexSearcher searcher = new IndexSearcher(indexDir);
+				Term term = new Term(ProbingTool.DOCUMENT_FIELD, ProbingTool.DOCUMENT_CATCHPHRASE);
+				Query query = new TermQuery(term);
+				int hits = searcher.search(query, 1).totalHits;
+				if (hits == 1) {
+					return true;
+				} else {
+					return false;
+				}
 			}
-		} catch (CorruptIndexException e) {
-			LOG.error("Index corrupted! ", e);
-		} catch (LockObtainFailedException e) {
-			LOG.error("Index locked! ", e);
-		} catch (IOException e) {
-			LOG.error("Error: ", e);
-		}
-
-		return outcome;
+		});
 	}
 
 	public boolean remove() {
-		if (indexDir == null)
-			throw new AssertionError("Index directory cannot be null. ");
-		boolean outcome = false;
-		try {
-			IndexWriter writer = getIndexWriter();
-			writer.deleteDocuments(new Term(ProbingTool.DOCUMENT_FIELD,
-					ProbingTool.DOCUMENT_CATCHPHRASE));
-			writer.close();
-			outcome = true;
-		} catch (CorruptIndexException e) {
-			LOG.error("Index corrupted! ", e);
-		} catch (LockObtainFailedException e) {
-			LOG.error("Index locked! ", e);
-		} catch (IOException e) {
-			LOG.error("Error: ", e);
+		return luceneProbingTemplate.probe(new ProbeCode() {
+			public boolean execute() throws CorruptIndexException, LockObtainFailedException, IOException {
+				IndexWriter writer = getIndexWriter();
+				writer.deleteDocuments(new Term(ProbingTool.DOCUMENT_FIELD, ProbingTool.DOCUMENT_CATCHPHRASE));
+				writer.close();
+				
+				return true;
+			}
+		});
+	}
+
+	private IndexWriter getIndexWriter() throws CorruptIndexException, LockObtainFailedException, IOException {
+		return new IndexWriter(indexDir, new StandardAnalyzer(), false, IndexWriter.MaxFieldLength.LIMITED);
+	}
+	
+	private interface ProbeCode {
+		boolean execute() throws CorruptIndexException, LockObtainFailedException, IOException;
+	}
+	
+	private interface Probeable {
+		boolean probe(ProbeCode code);
+	}
+	
+	private Probeable luceneProbingTemplate = new Probeable() {
+		public boolean probe(ProbeCode code) {
+			if (indexDir == null) throw new AssertionError("Index directory cannot be null. ");
+			boolean outcome = false;
+			try {
+				outcome = code.execute();
+			} catch (CorruptIndexException e) {
+				LOG.error("Index corrupted! ", e);
+			} catch (LockObtainFailedException e) {
+				LOG.error("Index locked! ", e);
+			} catch (IOException e) {
+				LOG.error("Error: ", e);
+			}
+	
+			return outcome;
 		}
-
-		return outcome;
-	}
-
-	private IndexWriter getIndexWriter() throws CorruptIndexException,
-			LockObtainFailedException, IOException {
-		return new IndexWriter(indexDir, new StandardAnalyzer(), false,
-				IndexWriter.MaxFieldLength.LIMITED);
-	}
-
+	};
+	
 }
