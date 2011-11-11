@@ -2,6 +2,9 @@ package fragsoft.indexprober;
 
 public interface ProbingTool {
 	
+	public static final String DOCUMENT_FIELD = "stub";
+	public static final String DOCUMENT_CATCHPHRASE = "indexprobingtoolcatchphrase";
+	
 	/**
 	 * Inserts a pre-agreed document into the index.
 	 * 
